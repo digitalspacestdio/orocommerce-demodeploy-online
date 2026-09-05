@@ -1,68 +1,49 @@
-OroCommerce Sample Application
-==============================
+# OroCommerce demo site
 
-Demo deployment (branch `7.0.x`)
---------------------------------
+Stock **OroCommerce Community Edition** with the Oro demo data, packaged as a Docker stack for a
+public demo site. The application itself is the upstream sample application
+([oroinc/orocommerce-application](https://github.com/oroinc/orocommerce-application)) — branch
+`7.0.x` is its tag `7.0.4` plus the Docker stack in `docker/` and the compose files in the root.
+No bundle, theme or configuration of the application is customised.
 
-This branch is the unmodified `7.0.4` application plus a Docker stack that installs
-OroCommerce **with demo data** and serves it — locally and on a server. See
-[docs/demo-stack.md](docs/demo-stack.md).
+## Quick start
 
 ```sh
-make up          # or: docker compose up -d   (first run installs Oro, 20-40 min)
-make logs        # installer progress
+make up      # or: docker compose up -d   (creates .env from .env.example)
+make logs    # installer progress
 ```
 
-Storefront <http://localhost:8092>, back-office <http://localhost:8092/admin>, mail
-<http://localhost:8026>. Logins: `admin` / `Admin1234!` for the back-office; storefront demo
-customers sign in with their e-mail as both login and password, e.g. `AmandaRCole@example.org`.
-Deploy with `docker-compose.prod.yml` (embedded Traefik) or `docker-compose.dokploy.yml` (Dokploy).
+The first run installs OroCommerce with demo data (20-40 minutes); with a snapshot in
+`docker/orocommerce/dumps/demo/` it takes about five.
 
-Rules and full instructions for this branch: [AGENTS.md](AGENTS.md).
+| | |
+| --- | --- |
+| Storefront | <http://localhost:8092> |
+| Back-office | <http://localhost:8092/admin> |
+| Mail (Mailpit) | <http://localhost:8026> |
 
-What Is Included?
---------------------
+Logins: **`admin` / `Admin1234!`** for the back-office; storefront demo customers use their
+e-mail as both login and password, for example `AmandaRCole@example.org`.
 
-This sample application includes OroCommerce Community Edition.
+## Deploy
 
-Other application distributions:
-  * orocommerce-enterprise-application - OroCommerce Enterprise Edition
-  * orocommerce-enterprise-nocrm-application - OroCommerce Enterprise Edition, without CRM modules
-  * orocommerce-platform-application - OroCommerce Enterprise Edition, with additional marketplace modules
+```sh
+make prod-up                                        # Docker host, embedded Traefik + HTTPS
+docker compose -f docker-compose.dokploy.yml up -d  # Dokploy, platform Traefik
+```
 
+Set `ORO_APP_URL`, `ORO_PUBLIC_HOST`, `ORO_PUBLIC_HTTPS`, `ORO_SECRET` and `TRAEFIK_HOST_RULE` in
+`.env` first. Demo data is installed on every fresh environment automatically; `make dump` creates
+a snapshot that `ORO_DUMP_URL` restores in minutes instead.
 
-  * orocommerce-application-de - German-localized version of OroCommerce Community Edition
-  * orocommerce-enterprise-application-de - German-localized version of OroCommerce Enterprise Edition
+## Documentation
 
+- [AGENTS.md](AGENTS.md) — rules, configuration, credentials, snapshots, deploy, troubleshooting
+- [docs/demo-stack.md](docs/demo-stack.md) — short description of the stack
+- [Upstream sample application](https://github.com/oroinc/orocommerce-application) — the
+  application this branch is based on, and its other distributions
+- [OroCommerce documentation](https://doc.oroinc.com)
 
-  * platform-application - OroPlatform Community Edition, without eCommerce/CRM/marketplace modules
-  * crm-application - OroCRM Community Edition, without eCommerce/marketplace modules
-  * crm-enterprise-application - OroCRM Enterprise Edition, without eCommerce/marketplace modules
-  * oromarketplace-application - legacy version (4.2 compatible) of OroCommerce Enterprise Edition with additional marketplace modules
+## License
 
-What is OroCommerce?
---------------------
-
-OroCommerce is an open-source Business to Business Commerce application built with flexibility in mind. It can be customized and extended to fit any B2B commerce needs.
-You can find out more about OroCommerce at [www.orocommerce.com](https://www.orocommerce.com/).
-
-System Requirements
--------------------
-
-Please see the OroCommerce online documentation for the complete list of [system requirements](https://doc.oroinc.com/backend/setup/system-requirements/).
-
-Installation
-------------
-
-Please see the [OroCommerce and OroCRM Community Edition Installation Guide](https://doc.oroinc.com/backend/setup/dev-environment/manual-installation/commerce-ce/) for the detailed installation steps.
-
-Resources
----------
-
-  * [OroCommerce Documentation](https://doc.oroinc.com)
-  * [Contributing](https://doc.oroinc.com/community/contribute/)
-
-License
--------
- 
-[OSL-3.0](LICENSE) Copyright (c) 2024 Oro Inc.
+[OSL-3.0](LICENSE), Oro Inc. — the same license as the upstream application.
