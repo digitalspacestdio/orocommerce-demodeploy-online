@@ -52,10 +52,16 @@ spec:
       labels:
         {{- include "orocommerce.componentSelectorLabels" $gctx | nindent 8 }}
     spec:
+      # staging ns has a Service named `api` (primebroker) that injects
+      # API_PORT=tcp://… into every pod; gotenberg then misreads it as --api-port.
+      enableServiceLinks: false
       containers:
         - name: gotenberg
           image: "{{ .Values.gotenberg.image.repository }}:{{ .Values.gotenberg.image.tag }}"
           imagePullPolicy: {{ .Values.gotenberg.image.pullPolicy }}
+          env:
+            - name: API_PORT
+              value: "3000"
           ports:
             - name: http
               containerPort: 3000
