@@ -79,6 +79,9 @@ postgres:
       cpu: "2"
       memory: 2Gi
 
+# accessModes inherit the chart default (ReadWriteOnce), which requires every app pod to be
+# scheduled onto the same node. Switch both claims to ReadWriteMany if the target cluster spans
+# more than one node and its storage class supports it — see values.yaml for the failure mode.
 persistence:
   varData:
     size: 5Gi

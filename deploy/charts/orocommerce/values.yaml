@@ -134,13 +134,21 @@ postgres:
       cpu: "2"
       memory: 2Gi
 
+# Both claims are mounted by every app workload (fpm, consumer, cron, websocket, nginx and the
+# bootstrap job). ReadWriteOnce therefore pins all of them to a single node: fine on a one-node
+# staging cluster, but on a multi-node cluster the pods that lose the scheduling race stay Pending
+# with a Multi-Attach error. Set ReadWriteMany here when the storage class supports it.
 persistence:
   varData:
     size: 5Gi
     storageClass: ""
+    accessModes:
+      - ReadWriteOnce
   media:
     size: 10Gi
     storageClass: ""
+    accessModes:
+      - ReadWriteOnce
 
 # Workload resources — compose-aligned defaults (design.md risk row).
 resources:

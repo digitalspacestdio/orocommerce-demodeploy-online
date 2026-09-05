@@ -6,7 +6,7 @@ metadata:
     {{- include "orocommerce.labels" . | nindent 4 }}
 spec:
   accessModes:
-    - ReadWriteOnce
+    {{- toYaml .Values.persistence.varData.accessModes | nindent 4 }}
   resources:
     requests:
       storage: {{ .Values.persistence.varData.size }}
@@ -22,7 +22,7 @@ metadata:
     {{- include "orocommerce.labels" . | nindent 4 }}
 spec:
   accessModes:
-    - ReadWriteOnce
+    {{- toYaml .Values.persistence.media.accessModes | nindent 4 }}
   resources:
     requests:
       storage: {{ .Values.persistence.media.size }}
