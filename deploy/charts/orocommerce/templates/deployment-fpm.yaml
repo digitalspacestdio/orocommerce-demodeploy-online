@@ -1,0 +1,48 @@
+{{- $ctx := dict "Chart" .Chart "Release" .Release "Values" .Values "component" "fpm" }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "orocommerce.fullname" . }}-fpm
+  labels:
+    {{- include "orocommerce.componentLabels" $ctx | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount.fpm }}
+  selector:
+    matchLabels:
+      {{- include "orocommerce.componentSelectorLabels" $ctx | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "orocommerce.componentSelectorLabels" $ctx | nindent 8 }}
+    spec:
+      initContainers:
+        {{- include "orocommerce.waitBootstrapInit" . | nindent 8 }}
+      containers:
+        - name: fpm
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["php-fpm", "-R"]
+          ports:
+            - name: fpm
+              containerPort: 9000
+          env:
+            {{- include "orocommerce.appEnv" . | nindent 12 }}
+          volumeMounts:
+            {{- include "orocommerce.appVolumeMounts" . | nindent 12 }}
+          readinessProbe:
+            exec:
+              command: ["oro-fpm-healthcheck"]
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 12
+          livenessProbe:
+            exec:
+              command: ["oro-fpm-healthcheck"]
+            initialDelaySeconds: 60
+            periodSeconds: 20
+            timeoutSeconds: 5
+          resources:
+            {{- toYaml .Values.resources.fpm | nindent 12 }}
+      volumes:
+        {{- include "orocommerce.appVolumes" . | nindent 8 }}

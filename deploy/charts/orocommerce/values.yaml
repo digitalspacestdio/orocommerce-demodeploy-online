@@ -1,0 +1,204 @@
+# Default values for the OroCommerce demo chart.
+# Override per release with -f deploy/releases/<name>.values.yaml.
+# Never commit real secrets here — only key names and public demo defaults.
+
+nameOverride: ""
+fullnameOverride: ""
+
+# Application (Dockerfile.prod) and nginx (Dockerfile.nginx) images.
+# Registry/repository are open questions (design.md Open Questions §2) —
+# set full references in the release values file at deploy time.
+image:
+  repository: orocommerce-demo
+  tag: "7.0.4"
+  pullPolicy: IfNotPresent
+
+nginx:
+  image:
+    repository: orocommerce-demo-nginx
+    tag: "7.0.4"
+    pullPolicy: IfNotPresent
+  # kube-dns / CoreDNS cluster resolver (replaces Docker 127.0.0.11).
+  resolver: kube-dns.kube-system.svc.cluster.local
+
+# External Secret holding credentials. Chart templates only reference keys —
+# values are never rendered into manifests from this file.
+#
+# Expected Secret keys (create out-of-band / Paperclip secrets → k8s):
+#   ORO_SECRET          — Symfony application secret (required)
+#   ORO_DB_URL          — full postgres:// DSN including serverVersion=17.6 (required)
+#   ORO_DB_DSN          — same as ORO_DB_URL for Oro (required)
+#   ORO_DB_PASSWORD     — Postgres password for the postgres StatefulSet POSTGRES_* env (required)
+#   ORO_DUMP_URL        — optional HTTPS URL of demo.tar.gz snapshot (needed for restore)
+#   ORO_USER_PASSWORD   — optional; used when admin.rotatePassword=true
+secret:
+  name: orocommerce-secrets
+
+# Non-secret public/runtime configuration (ConfigMap).
+config:
+  ORO_ENV: prod
+  ORO_SKIP_COMPOSER: "1"
+  ORO_PUBLIC_HTTPS: "on"
+  ORO_MAILER_ENCRYPTION: none
+  ORO_MQ_DSN: "dbal:"
+  ORO_SESSION_DSN: "native:"
+  ORO_SEARCH_URL: "orm:"
+  ORO_SEARCH_ENGINE_DSN: "orm:?prefix=oro_search"
+  ORO_WEBSITE_SEARCH_ENGINE_DSN: "orm:?prefix=oro_website_search"
+  ORO_WEBSOCKET_SERVER_DSN: "//0.0.0.0:8080"
+  ORO_LOG_PATH: "php://stderr"
+  ORO_SAMPLE_DATA: "y"
+  ORO_LANGUAGE: en
+  ORO_FORMATTING_CODE: en_US
+  ORO_USER_NAME: admin
+  ORO_USER_EMAIL: admin@example.com
+  ORO_ORGANIZATION_NAME: "OroCommerce Demo"
+  ORO_DUMP_NAME: demo
+  # Set by release values (must match ingress host):
+  ORO_APP_URL: ""
+  ORO_PUBLIC_HOST: ""
+
+# Bootstrap Job (Helm pre-install/pre-upgrade hook).
+bootstrap:
+  # restore | install | auto — design.md decision 3; staging defaults to restore.
+  installMode: restore
+  # When false, skip destructive restore if oro_is_installed (design.md decision 3).
+  forceRestore: false
+  activeDeadlineSeconds: 3600
+  backoffLimit: 1
+  resources:
+    requests:
+      cpu: 250m
+      memory: 1Gi
+    limits:
+      cpu: "2"
+      memory: 3Gi
+
+# Optional post-restore admin password rotation (design.md decision 6 / open Q5).
+admin:
+  rotatePassword: false
+
+# Mailpit — staging mail catcher. ORO_MAILER_DSN is built to this Service.
+mailpit:
+  enabled: true
+  image:
+    repository: axllent/mailpit
+    tag: latest
+    pullPolicy: IfNotPresent
+  # When true, create an Ingress for the Mailpit UI (PO decision — design.md Q4).
+  exposeUI: false
+  resources:
+    requests:
+      cpu: 10m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
+# Gotenberg PDF — gated; default true with PO opt-out (design.md open Q3).
+gotenberg:
+  enabled: true
+  image:
+    repository: gotenberg/gotenberg
+    tag: "8"
+    pullPolicy: IfNotPresent
+  resources:
+    requests:
+      cpu: 50m
+      memory: 256Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+
+postgres:
+  enabled: true
+  image:
+    repository: oroinc/pgsql
+    tag: 17.6-alpine
+    pullPolicy: IfNotPresent
+  auth:
+    database: oro_db
+    username: oro_db_user
+    # Password comes from secret key ORO_DB_PASSWORD (not committed).
+  persistence:
+    size: 20Gi
+    storageClass: ""
+  # Compose defaults — tune via values if cluster headroom is tight (open Q6).
+  sharedBuffers: 512MB
+  shmSize: 512Mi
+  resources:
+    requests:
+      cpu: 250m
+      memory: 1Gi
+    limits:
+      cpu: "2"
+      memory: 2Gi
+
+persistence:
+  varData:
+    size: 5Gi
+    storageClass: ""
+  media:
+    size: 10Gi
+    storageClass: ""
+
+# Workload resources — compose-aligned defaults (design.md risk row).
+resources:
+  fpm:
+    requests:
+      cpu: 250m
+      memory: 1Gi
+    limits:
+      cpu: "2"
+      memory: 3Gi
+  nginx:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+  consumer:
+    requests:
+      cpu: 100m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 2Gi
+  cron:
+    requests:
+      cpu: 50m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 1Gi
+  websocket:
+    requests:
+      cpu: 50m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 1Gi
+
+replicaCount:
+  fpm: 1
+  nginx: 1
+  consumer: 1
+  cron: 1
+  websocket: 1
+
+ingress:
+  enabled: true
+  className: nginx
+  host: ""
+  annotations: {}
+  # TLS terminated at Cloudflare for *.demodeploy.online — leave disabled.
+  tls:
+    enabled: false
+
+robots:
+  noindex: true
+
+serviceAccount:
+  create: false
+  name: ""

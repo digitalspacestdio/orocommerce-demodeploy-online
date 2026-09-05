@@ -1,0 +1,133 @@
+# Staging release values for orocommerce.demodeploy.online
+# Parent: DIG-3000 / Implement: DIG-3003 / OpenSpec: orocommerce-staging-helm
+#
+# Secrets are NOT here — create Secret `orocommerce-secrets` in the release
+# namespace (Paperclip / sealed-secrets / external-secrets) with keys documented
+# in deploy/charts/orocommerce/values.yaml (ORO_SECRET, ORO_DB_URL, ORO_DB_DSN,
+# ORO_DB_PASSWORD, optional ORO_DUMP_URL, optional ORO_USER_PASSWORD).
+
+# --- Open question: registry coordinates (design.md Open Questions §2) ---
+# Replace placeholders with the agreed registry/repo before Birdperson deploys.
+image:
+  repository: REPLACE_ME_REGISTRY/orocommerce-demo
+  tag: REPLACE_ME_GIT_SHA
+  pullPolicy: IfNotPresent
+
+nginx:
+  image:
+    repository: REPLACE_ME_REGISTRY/orocommerce-demo-nginx
+    tag: REPLACE_ME_GIT_SHA
+    pullPolicy: IfNotPresent
+
+secret:
+  name: orocommerce-secrets
+  # ORO_DB_URL / ORO_DB_DSN host must be the in-cluster Postgres Service DNS, e.g.
+  # postgres://oro_db_user:…@orocommerce-postgres:5432/oro_db?sslmode=disable&charset=utf8&serverVersion=17.6
+  # (replace `orocommerce` with the Helm release name).
+
+config:
+  ORO_APP_URL: https://orocommerce.demodeploy.online
+  ORO_PUBLIC_HOST: orocommerce.demodeploy.online
+  ORO_PUBLIC_HTTPS: "on"
+  ORO_ENV: prod
+  ORO_SKIP_COMPOSER: "1"
+  ORO_DUMP_NAME: demo
+  # ORO_MAILER_DSN is NOT set here — the chart hardcodes smtp://<release>-mailpit:1025
+  # when mailpit.enabled=true (design.md decision 6 / task 4.4). Never point staging
+  # at a real SMTP relay.
+
+bootstrap:
+  # Prefer restore once a snapshot is published (design.md Open Questions §1).
+  # Until ORO_DUMP_URL is set in the Secret, Birdperson may temporarily set
+  # installMode: install (20–40 min first boot).
+  installMode: restore
+  forceRestore: false
+  activeDeadlineSeconds: 3600
+  backoffLimit: 1
+
+# --- Open question: public demo credentials (design.md Open Questions §5) ---
+# Leave false to keep published demo admin password; set true + provide
+# ORO_USER_PASSWORD in the Secret to rotate after restore.
+admin:
+  rotatePassword: false
+
+# --- Open question: Gotenberg in v1 staging (design.md Open Questions §3) ---
+# Default true; PO may set false to defer PDF generation.
+gotenberg:
+  enabled: true
+
+# --- Open question: Mailpit UI exposure (design.md Open Questions §4) ---
+# ClusterIP-only by default; set exposeUI: true only if QA needs the UI ingress.
+mailpit:
+  enabled: true
+  exposeUI: false
+
+# --- Open question: cluster resource headroom (design.md Open Questions §6) ---
+# Defaults match compose (shared_buffers=512MB, PHP memory footprint). Birdperson
+# may lower requests/limits if demodeploy nodes are constrained.
+postgres:
+  enabled: true
+  persistence:
+    size: 20Gi
+  sharedBuffers: 512MB
+  shmSize: 512Mi
+  resources:
+    requests:
+      cpu: 250m
+      memory: 1Gi
+    limits:
+      cpu: "2"
+      memory: 2Gi
+
+persistence:
+  varData:
+    size: 5Gi
+  media:
+    size: 10Gi
+
+resources:
+  fpm:
+    requests:
+      cpu: 250m
+      memory: 1Gi
+    limits:
+      cpu: "2"
+      memory: 3Gi
+  nginx:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+  consumer:
+    requests:
+      cpu: 100m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 2Gi
+  cron:
+    requests:
+      cpu: 50m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 1Gi
+  websocket:
+    requests:
+      cpu: 50m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 1Gi
+
+ingress:
+  enabled: true
+  className: nginx
+  host: orocommerce.demodeploy.online
+  tls:
+    enabled: false
+
+robots:
+  noindex: true

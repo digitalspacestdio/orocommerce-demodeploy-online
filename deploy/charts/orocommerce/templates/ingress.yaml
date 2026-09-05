@@ -1,0 +1,72 @@
+{{- if .Values.ingress.enabled }}
+{{- if not .Values.ingress.host }}
+{{- fail "ingress.host is required (e.g. orocommerce.demodeploy.online)" }}
+{{- end }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "orocommerce.fullname" . }}
+  labels:
+    {{- include "orocommerce.labels" . | nindent 4 }}
+  annotations:
+    {{- if .Values.robots.noindex }}
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      more_set_headers "X-Robots-Tag: noindex, nofollow";
+    {{- end }}
+    {{- with .Values.ingress.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  rules:
+    - host: {{ .Values.ingress.host | quote }}
+      http:
+        paths:
+          - path: /ws
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "orocommerce.fullname" . }}-websocket
+                port:
+                  number: 8080
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "orocommerce.fullname" . }}-nginx
+                port:
+                  number: 80
+  {{- if .Values.ingress.tls.enabled }}
+  tls:
+    - hosts:
+        - {{ .Values.ingress.host | quote }}
+      secretName: {{ include "orocommerce.fullname" . }}-tls
+  {{- end }}
+{{- end }}
+{{- if and .Values.mailpit.enabled .Values.mailpit.exposeUI .Values.ingress.enabled }}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "orocommerce.fullname" . }}-mailpit
+  labels:
+    {{- include "orocommerce.labels" . | nindent 4 }}
+  annotations:
+    {{- if .Values.robots.noindex }}
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      more_set_headers "X-Robots-Tag: noindex, nofollow";
+    {{- end }}
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  rules:
+    - host: {{ printf "mailpit-%s" .Values.ingress.host | quote }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "orocommerce.fullname" . }}-mailpit
+                port:
+                  number: 8025
+{{- end }}

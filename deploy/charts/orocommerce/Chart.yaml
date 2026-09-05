@@ -1,0 +1,6 @@
+apiVersion: v2
+name: orocommerce
+description: OroCommerce CE demo site — multi-workload Helm chart for demodeploy staging
+type: application
+version: 0.1.0
+appVersion: "7.0.4"

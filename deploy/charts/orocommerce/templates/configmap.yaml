@@ -1,0 +1,28 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "orocommerce.fullname" . }}-config
+  labels:
+    {{- include "orocommerce.labels" . | nindent 4 }}
+data:
+  ORO_ENV: {{ .Values.config.ORO_ENV | quote }}
+  ORO_SKIP_COMPOSER: {{ .Values.config.ORO_SKIP_COMPOSER | quote }}
+  ORO_APP_URL: {{ required "config.ORO_APP_URL is required" .Values.config.ORO_APP_URL | quote }}
+  ORO_PUBLIC_HOST: {{ required "config.ORO_PUBLIC_HOST is required" .Values.config.ORO_PUBLIC_HOST | quote }}
+  ORO_PUBLIC_HTTPS: {{ .Values.config.ORO_PUBLIC_HTTPS | quote }}
+  ORO_MAILER_ENCRYPTION: {{ .Values.config.ORO_MAILER_ENCRYPTION | quote }}
+  ORO_MQ_DSN: {{ .Values.config.ORO_MQ_DSN | quote }}
+  ORO_SESSION_DSN: {{ .Values.config.ORO_SESSION_DSN | quote }}
+  ORO_SEARCH_URL: {{ .Values.config.ORO_SEARCH_URL | quote }}
+  ORO_SEARCH_ENGINE_DSN: {{ .Values.config.ORO_SEARCH_ENGINE_DSN | quote }}
+  ORO_WEBSITE_SEARCH_ENGINE_DSN: {{ .Values.config.ORO_WEBSITE_SEARCH_ENGINE_DSN | quote }}
+  ORO_WEBSOCKET_SERVER_DSN: {{ .Values.config.ORO_WEBSOCKET_SERVER_DSN | quote }}
+  ORO_LOG_PATH: {{ .Values.config.ORO_LOG_PATH | quote }}
+  ORO_SAMPLE_DATA: {{ .Values.config.ORO_SAMPLE_DATA | quote }}
+  ORO_LANGUAGE: {{ .Values.config.ORO_LANGUAGE | quote }}
+  ORO_FORMATTING_CODE: {{ .Values.config.ORO_FORMATTING_CODE | quote }}
+  ORO_USER_NAME: {{ .Values.config.ORO_USER_NAME | quote }}
+  ORO_USER_EMAIL: {{ .Values.config.ORO_USER_EMAIL | quote }}
+  ORO_ORGANIZATION_NAME: {{ .Values.config.ORO_ORGANIZATION_NAME | quote }}
+  ORO_DUMP_NAME: {{ .Values.config.ORO_DUMP_NAME | quote }}
+  ORO_INSTALL_MODE: {{ .Values.bootstrap.installMode | quote }}

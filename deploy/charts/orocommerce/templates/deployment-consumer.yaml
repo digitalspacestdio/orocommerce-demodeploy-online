@@ -1,0 +1,35 @@
+{{- $ctx := dict "Chart" .Chart "Release" .Release "Values" .Values "component" "consumer" }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "orocommerce.fullname" . }}-consumer
+  labels:
+    {{- include "orocommerce.componentLabels" $ctx | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount.consumer }}
+  selector:
+    matchLabels:
+      {{- include "orocommerce.componentSelectorLabels" $ctx | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "orocommerce.componentSelectorLabels" $ctx | nindent 8 }}
+    spec:
+      initContainers:
+        {{- include "orocommerce.waitBootstrapInit" . | nindent 8 }}
+      containers:
+        - name: consumer
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command:
+            - sh
+            - -c
+            - "until php bin/console oro:message-queue:consume; do echo 'consumer exited, restarting in 15s'; sleep 15; done"
+          env:
+            {{- include "orocommerce.appEnv" . | nindent 12 }}
+          volumeMounts:
+            {{- include "orocommerce.appVolumeMounts" . | nindent 12 }}
+          resources:
+            {{- toYaml .Values.resources.consumer | nindent 12 }}
+      volumes:
+        {{- include "orocommerce.appVolumes" . | nindent 8 }}
