@@ -12,6 +12,8 @@ spec:
       {{- include "orocommerce.componentSelectorLabels" $ctx | nindent 6 }}
   template:
     metadata:
+      annotations:
+        checksum/nginx-config: {{ include (print $.Template.BasePath "/configmap-nginx.yaml") . | sha256sum }}
       labels:
         {{- include "orocommerce.componentSelectorLabels" $ctx | nindent 8 }}
     spec:

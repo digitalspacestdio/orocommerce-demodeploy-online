@@ -1,10 +1,15 @@
 # Public entry point for demodeploy staging: nginx → php-fpm / websocket.
 # k8s-specific: kube-dns resolver and chart Service DNS names (design.md decision 4).
 # Do not edit docker/orocommerce/default.conf.template — that remains for compose.
+#
+# Cloudflare terminates TLS and talks HTTP to the origin. ingress-nginx therefore
+# often forwards X-Forwarded-Proto: http. Mapping that to HTTPS=off makes the
+# storefront redirect to https://… forever (same URL). Always tell PHP the
+# public site is HTTPS when ORO_PUBLIC_HTTPS is on.
 map $http_x_forwarded_proto $fcgi_https {
     default on;
     https   on;
-    http    off;
+    http    on;
 }
 
 map $http_host $oro_host {
@@ -18,8 +23,8 @@ server {
     listen 80;
     server_name _;
     resolver {{ .Values.nginx.resolver }} valid=10s ipv6=off;
-    set $fpm_upstream {{ include "orocommerce.fullname" . }}-fpm:9000;
-    set $ws_upstream http://{{ include "orocommerce.fullname" . }}-websocket:8080;
+    set $fpm_upstream {{ include "orocommerce.fullname" . }}-fpm.{{ .Release.Namespace }}.svc.cluster.local:9000;
+    set $ws_upstream http://{{ include "orocommerce.fullname" . }}-websocket.{{ .Release.Namespace }}.svc.cluster.local:8080;
 
     root /var/www/public;
     index index.php;
