@@ -8,14 +8,13 @@ metadata:
   name: {{ include "orocommerce.fullname" . }}
   labels:
     {{- include "orocommerce.labels" . | nindent 4 }}
+  {{- with .Values.ingress.annotations }}
   annotations:
-    {{- if .Values.robots.noindex }}
-    nginx.ingress.kubernetes.io/configuration-snippet: |
-      more_set_headers "X-Robots-Tag: noindex, nofollow";
-    {{- end }}
-    {{- with .Values.ingress.annotations }}
     {{- toYaml . | nindent 4 }}
-    {{- end }}
+  {{- end }}
+  # noindex / robots.txt are enforced by the app nginx ConfigMap
+  # (files/default.conf.template). Do not use configuration-snippet here —
+  # demodeploy ingress-nginx has allow-snippet-annotations=false.
 spec:
   ingressClassName: {{ .Values.ingress.className }}
   rules:
@@ -51,11 +50,6 @@ metadata:
   name: {{ include "orocommerce.fullname" . }}-mailpit
   labels:
     {{- include "orocommerce.labels" . | nindent 4 }}
-  annotations:
-    {{- if .Values.robots.noindex }}
-    nginx.ingress.kubernetes.io/configuration-snippet: |
-      more_set_headers "X-Robots-Tag: noindex, nofollow";
-    {{- end }}
 spec:
   ingressClassName: {{ .Values.ingress.className }}
   rules:
