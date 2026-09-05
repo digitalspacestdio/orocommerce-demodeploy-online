@@ -1,0 +1,25 @@
+# Demo site on Dokploy: full stack without its own Traefik; the platform Traefik reads the
+# labels of the `oro-nginx` service on dokploy-network (no host port bindings).
+#
+# In Dokploy: Compose project → compose file `docker-compose.dokploy.yml`, environment from
+# .env.example (ORO_APP_URL, ORO_PUBLIC_HOST, ORO_PUBLIC_HTTPS=on, ORO_SECRET, TRAEFIK_HOST_RULE).
+name: orodemo-prod
+
+include:
+  - path: docker/compose/infrastructure.yml
+  - path: docker/compose/orocommerce.prod.yml
+  - path: docker/compose/traefik-labels.yml
+
+networks:
+  dokploy-network:
+    external: true
+
+services:
+  oro-db:
+    ports: []
+  mail:
+    ports: []
+  oro-nginx:
+    networks:
+      - default
+      - dokploy-network

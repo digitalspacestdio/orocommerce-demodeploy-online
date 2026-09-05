@@ -1,0 +1,20 @@
+# Traefik routing labels for the public entry point (oro-nginx).
+# Used by docker-compose.prod.yml (embedded Traefik) and docker-compose.dokploy.yml (platform Traefik).
+# TRAEFIK_HOST_RULE example: Host(`demo.example.com`)
+services:
+  oro-nginx:
+    labels:
+      traefik.enable: "true"
+      traefik.docker.network: "${TRAEFIK_DOCKER_NETWORK:-dokploy-network}"
+      traefik.http.services.orodemo.loadbalancer.server.port: "80"
+      traefik.http.services.orodemo.loadbalancer.passhostheader: "true"
+      traefik.http.routers.orodemo.rule: "${TRAEFIK_HOST_RULE:?set TRAEFIK_HOST_RULE in .env}"
+      traefik.http.routers.orodemo.entrypoints: "${TRAEFIK_HTTP_ENTRYPOINT:-web}"
+      traefik.http.routers.orodemo.service: "orodemo"
+      traefik.http.routers.orodemo.middlewares: "orodemo-https-redirect"
+      traefik.http.middlewares.orodemo-https-redirect.redirectscheme.scheme: "https"
+      traefik.http.middlewares.orodemo-https-redirect.redirectscheme.permanent: "true"
+      traefik.http.routers.orodemo-secure.rule: "${TRAEFIK_HOST_RULE:?set TRAEFIK_HOST_RULE in .env}"
+      traefik.http.routers.orodemo-secure.entrypoints: "${TRAEFIK_HTTPS_ENTRYPOINT:-websecure}"
+      traefik.http.routers.orodemo-secure.service: "orodemo"
+      traefik.http.routers.orodemo-secure.tls.certresolver: "${TRAEFIK_CERT_RESOLVER:-letsencrypt}"

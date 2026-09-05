@@ -1,6 +1,25 @@
 OroCommerce Sample Application
 ==============================
 
+Demo deployment (branch `7.0.x`)
+--------------------------------
+
+This branch is the unmodified `7.0.4` application plus a Docker stack that installs
+OroCommerce **with demo data** and serves it — locally and on a server. See
+[docs/demo-stack.md](docs/demo-stack.md).
+
+```sh
+make up          # or: docker compose up -d   (first run installs Oro, 20-40 min)
+make logs        # installer progress
+```
+
+Storefront <http://localhost:8092>, back-office <http://localhost:8092/admin>, mail
+<http://localhost:8026>. Logins: `admin` / `Admin1234!` for the back-office; storefront demo
+customers sign in with their e-mail as both login and password, e.g. `AmandaRCole@example.org`.
+Deploy with `docker-compose.prod.yml` (embedded Traefik) or `docker-compose.dokploy.yml` (Dokploy).
+
+Rules and full instructions for this branch: [AGENTS.md](AGENTS.md).
+
 What Is Included?
 --------------------
 

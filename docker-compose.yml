@@ -1,38 +1,17 @@
-services:
-  pgsql:
-    image: postgres:18.3
-    ports: ['5432']
-    labels:
-      com.symfony.server.service-prefix: ORO_DB
-    environment:
-      POSTGRES_USER: oro_db_user
-      POSTGRES_DB: oro_db
-      POSTGRES_PASSWORD: oro_db_pass
-      POSTGRES_ROOT_PASSWORD: oro_db_pass
-    volumes:
-      - postgres:/var/lib/postgresql
-      - ./config/uuid-ossp.sql:/docker-entrypoint-initdb.d/uuid-ossp.sql:ro
-    healthcheck:
-      test: "pg_isready -U$${POSTGRES_USER} -d$${POSTGRES_DB}"
-      interval: 5s
-      timeout: 30s
-      start_period: 40s
-    restart: on-failure
-  redis:
-    image: redis:8.4.2-alpine
-    ports: ["6379"]
-    labels:
-      com.symfony.server.service-prefix: ORO_REDIS
-  mailcatcher:
-    image: schickling/mailcatcher
-    ports: ['1025', '1080']
-    labels:
-      com.symfony.server.service-prefix: ORO_MAILER
-  gotenberg:
-    image: gotenberg/gotenberg:8.23.2
-    ports: ["3000"]
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://127.0.0.1:3000/health"]
-    restart: on-failure
-volumes:
-  postgres: {}
+# Local demo stack: OroCommerce CE 7.0.4 (unmodified) with demo data, in Docker only.
+#
+#   cp .env.example .env            # optional overrides
+#   docker compose up -d            # first run: composer install + oro:install (20-40 min)
+#   docker compose logs -f oro-install
+#
+# Everything is served by `oro-nginx` on http://localhost:8092:
+#   /        storefront        /admin  back-office (admin / Admin1234!)
+#   Mail UI: http://localhost:8026
+#
+# The upstream Symfony local-server compose file shipped with the application was replaced
+# by this stack; it is still available as `git show 7.0.4:docker-compose.yml`.
+name: orodemo
+
+include:
+  - path: docker/compose/infrastructure.yml
+  - path: docker/compose/orocommerce.yml

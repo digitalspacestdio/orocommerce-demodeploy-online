@@ -1,0 +1,168 @@
+# OroCommerce CE 7.0.4, unmodified: php-fpm, message-queue consumer, cron, websocket, nginx.
+# The repository is bind-mounted; vendor/, node_modules/, var/ and generated public assets are volumes.
+x-oro-app: &oro-app
+  # The image is built once by `oro-install` (the first service to run); the others reuse it.
+  image: orocommerce-demo:7.0.4-dev
+  working_dir: /var/www
+  volumes:
+    - ../..:/var/www
+    - oro-vendor:/var/www/vendor
+    - oro-node-modules:/var/www/node_modules
+    - oro-var:/var/www/var
+    - oro-public-build:/var/www/public/build
+    - oro-public-bundles:/var/www/public/bundles
+    - oro-public-js:/var/www/public/js
+    - oro-public-media:/var/www/public/media
+    - ../orocommerce/dumps:/dumps
+  env_file:
+    - path: ../../.env
+      required: false
+  environment: &oro-env
+    APP_DIR: /var/www
+    PHP_UID: ${HOST_UID:-1000}
+    PHP_GID: ${HOST_GID:-1000}
+    ORO_ENV: ${ORO_ENV:-prod}
+    ORO_SECRET: ${ORO_SECRET:-ThisTokenIsNotSoSecretChangeIt}
+    ORO_DB_URL: postgres://${ORO_DB_USER:-oro_db_user}:${ORO_DB_PASSWORD:-oro_db_pass}@oro-db:5432/${ORO_DB_NAME:-oro_db}?sslmode=disable&charset=utf8&serverVersion=17.6
+    ORO_DB_DSN: postgres://${ORO_DB_USER:-oro_db_user}:${ORO_DB_PASSWORD:-oro_db_pass}@oro-db:5432/${ORO_DB_NAME:-oro_db}?sslmode=disable&charset=utf8&serverVersion=17.6
+    ORO_MAILER_DSN: smtp://mail:1025
+    ORO_MAILER_ENCRYPTION: none
+    ORO_MQ_DSN: "dbal:"
+    ORO_SESSION_DSN: "native:"
+    ORO_SEARCH_URL: "orm:"
+    ORO_SEARCH_ENGINE_DSN: "orm:?prefix=oro_search"
+    ORO_WEBSITE_SEARCH_ENGINE_DSN: "orm:?prefix=oro_website_search"
+    ORO_WEBSOCKET_SERVER_DSN: "//0.0.0.0:8080"
+    ORO_WEBSOCKET_FRONTEND_DSN: "//*:${HTTP_PORT:-8092}/ws"
+    ORO_WEBSOCKET_BACKEND_DSN: "tcp://oro-websocket:8080"
+    ORO_PDF_GENERATOR_GOTENBERG_API_URL: http://gotenberg:3000
+    ORO_LOG_PATH: php://stderr
+    # OAuth2 server keys live in the data volume (generated on first start, kept across rebuilds)
+    ORO_OAUTH_PRIVATE_KEY_PATH: "%kernel.project_dir%/var/data/oauth/oauth_private.key"
+    ORO_OAUTH_PUBLIC_KEY_PATH: "%kernel.project_dir%/var/data/oauth/oauth_public.key"
+    ORO_INSTALL_MODE: ${ORO_INSTALL_MODE:-auto}
+    ORO_DUMP_NAME: ${ORO_DUMP_NAME:-demo}
+    ORO_DUMP_URL: ${ORO_DUMP_URL:-}
+    ORO_APP_URL: ${ORO_APP_URL:-http://localhost:8092}
+    ORO_USER_NAME: ${ORO_USER_NAME:-admin}
+    ORO_USER_PASSWORD: ${ORO_USER_PASSWORD:-Admin1234!}
+    ORO_USER_EMAIL: ${ORO_USER_EMAIL:-admin@example.com}
+    ORO_ORGANIZATION_NAME: ${ORO_ORGANIZATION_NAME:-OroCommerce Demo}
+    ORO_SAMPLE_DATA: ${ORO_SAMPLE_DATA:-y}
+    ORO_LANGUAGE: ${ORO_LANGUAGE:-en}
+    ORO_FORMATTING_CODE: ${ORO_FORMATTING_CODE:-en_US}
+    XDEBUG_MODE: ${XDEBUG_MODE:-off}
+  extra_hosts:
+    - "host.docker.internal:host-gateway"
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+
+x-oro-depends: &oro-depends
+  oro-db:
+    condition: service_healthy
+  mail:
+    condition: service_started
+  oro-install:
+    condition: service_completed_successfully
+
+services:
+  # One-shot: composer install + oro:install with demo data (idempotent, see docker/orocommerce/install.sh)
+  oro-install:
+    <<: *oro-app
+    build:
+      context: ../orocommerce
+      dockerfile: Dockerfile
+    command: ["oro-install"]
+    restart: "no"
+    depends_on:
+      oro-db:
+        condition: service_healthy
+      mail:
+        condition: service_started
+
+  oro-fpm:
+    <<: *oro-app
+    command: ["php-fpm", "-R"]
+    healthcheck:
+      test: ["CMD", "oro-fpm-healthcheck"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    depends_on: *oro-depends
+    restart: unless-stopped
+
+  oro-consumer:
+    <<: *oro-app
+    command:
+      [
+        "sh",
+        "-c",
+        "until php bin/console oro:message-queue:consume -vv; do echo 'consumer exited, restarting in 15s'; sleep 15; done",
+      ]
+    init: true
+    depends_on: *oro-depends
+    restart: unless-stopped
+
+  oro-cron:
+    <<: *oro-app
+    command: ["/usr/bin/ofelia", "daemon", "--config", "/etc/ofelia.conf"]
+    depends_on: *oro-depends
+    restart: unless-stopped
+
+  oro-websocket:
+    <<: *oro-app
+    command:
+      [
+        "sh",
+        "-c",
+        "until php bin/console gos:websocket:server; do echo 'websocket exited, restarting in 15s'; sleep 15; done",
+      ]
+    init: true
+    depends_on: *oro-depends
+    restart: unless-stopped
+
+  # Optional (profile `assets`): rebuilds back-office/storefront theme assets on change.
+  # docker compose --profile assets up -d oro-assets-watch
+  oro-assets-watch:
+    <<: *oro-app
+    profiles: ["assets"]
+    command: ["sh", "-c", "bin/console oro:assets:build --env=${ORO_ENV:-prod} --watch"]
+    depends_on: *oro-depends
+    restart: unless-stopped
+
+  # Public entry point of the demo site.
+  oro-nginx:
+    image: nginx:1.28-alpine
+    environment:
+      ORO_PUBLIC_HOST: ${ORO_PUBLIC_HOST:-localhost:8092}
+      ORO_PUBLIC_HTTPS: ${ORO_PUBLIC_HTTPS:-off}
+    volumes:
+      - ../orocommerce/default.conf.template:/etc/nginx/templates/default.conf.template:ro
+      - ../..:/var/www:ro
+      - oro-public-build:/var/www/public/build:ro
+      - oro-public-bundles:/var/www/public/bundles:ro
+      - oro-public-js:/var/www/public/js:ro
+      - oro-public-media:/var/www/public/media:ro
+    ports:
+      - "${HTTP_PORT:-8092}:80"
+    depends_on:
+      oro-fpm:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/nginx-health"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  oro-vendor:
+  oro-node-modules:
+  oro-var:
+  oro-public-build:
+  oro-public-bundles:
+  oro-public-js:
+  oro-public-media:

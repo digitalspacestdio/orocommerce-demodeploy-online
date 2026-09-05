@@ -59,3 +59,9 @@ bin/*
 /.user.ini
 /npm-package
 /dev/npm-package
+
+# Docker demo stack
+/.env
+/docker/orocommerce/dumps/*
+!/docker/orocommerce/dumps/.gitignore
+/.pnpm-store

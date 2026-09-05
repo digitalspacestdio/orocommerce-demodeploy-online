@@ -1,0 +1,53 @@
+# Production image for the demo site: code, vendor and built assets baked in.
+# Build context: repository root (see docker/compose/orocommerce.prod.yml).
+#   docker build -f docker/orocommerce/Dockerfile.prod -t orocommerce-demo:7.0.4 .
+ARG BASE_IMAGE=ghcr.io/digitalspacestdio/orodc-php-node-symfony:8.5-node24-composer2-alpine
+
+# --- vendor: composer dependencies, cached by lock file ------------------------------------
+FROM ${BASE_IMAGE} AS vendor
+USER root
+WORKDIR /build
+ENV COMPOSER_MEMORY_LIMIT=-1 COMPOSER_ALLOW_SUPERUSER=1
+COPY composer.json composer.lock ./
+RUN --mount=type=cache,target=/root/.composer/cache \
+    composer install --no-interaction --no-progress --prefer-dist --no-dev --no-scripts --no-autoloader
+
+# --- app: full source + assets --------------------------------------------------------------
+FROM ${BASE_IMAGE} AS app
+USER root
+WORKDIR /var/www
+ENV COMPOSER_MEMORY_LIMIT=-1 COMPOSER_ALLOW_SUPERUSER=1 XDEBUG_MODE=off \
+    NODE_OPTIONS=--max-old-space-size=4096 ORO_ENV=prod
+COPY --from=vendor /build/vendor ./vendor
+COPY . .
+# Dev-only dependency descriptors are not needed at runtime.
+RUN rm -rf dev.json dev.lock docker \
+  && composer dump-autoload --no-dev --classmap-authoritative --no-interaction \
+  && composer run-script set-permissions --no-interaction \
+  && composer run-script install-npm-assets --no-interaction \
+  && composer run-script set-assets-version --no-interaction \
+  && composer run-script execute-post-install-package-scripts --no-interaction \
+  && bin/console oro:assets:install --env=prod --no-interaction \
+  && bin/console oro:assets:build --env=prod --no-interaction \
+  && rm -rf node_modules var/cache/* var/oauth_private.key var/oauth_public.key \
+  && chown -R 1000:1000 /var/www
+
+# --- runtime --------------------------------------------------------------------------------
+FROM ${BASE_IMAGE} AS runtime
+USER root
+RUN apk add --no-cache fcgi su-exec python3 && mkdir -p /dumps && chown 1000:1000 /dumps
+COPY --chmod=0755 docker/orocommerce/entrypoint.sh /usr/local/bin/oro-entrypoint
+COPY --chmod=0755 docker/orocommerce/healthcheck.sh /usr/local/bin/oro-fpm-healthcheck
+COPY --chmod=0755 docker/orocommerce/lib.sh /usr/local/bin/oro-lib
+COPY --chmod=0755 docker/orocommerce/install.sh /usr/local/bin/oro-install
+COPY --chmod=0755 docker/orocommerce/dump.sh /usr/local/bin/oro-dump
+COPY --chmod=0755 docker/orocommerce/dump-exists.sh /usr/local/bin/oro-dump-exists
+COPY --chmod=0755 docker/orocommerce/restore.sh /usr/local/bin/oro-restore
+COPY docker/orocommerce/php.ini /usr/local/etc/php/conf.d/zz-oro.ini
+COPY docker/orocommerce/ofelia.conf /etc/ofelia.conf
+COPY --from=app --chown=1000:1000 /var/www /var/www
+ENV APP_DIR=/var/www XDEBUG_MODE=off ORO_ENV=prod
+WORKDIR /var/www
+VOLUME ["/var/www/var/data", "/var/www/public/media"]
+ENTRYPOINT ["oro-entrypoint"]
+CMD ["php-fpm", "-R"]

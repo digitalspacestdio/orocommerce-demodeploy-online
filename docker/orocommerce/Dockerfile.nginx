@@ -1,0 +1,9 @@
+# nginx for the production image: ships the built public/ assets (bundles, build, js)
+# so no shared volume is needed between php-fpm and nginx. Uploaded media stays a volume.
+# Build context: repository root.
+ARG APP_IMAGE=orocommerce-demo:7.0.4
+FROM ${APP_IMAGE} AS app
+
+FROM nginx:1.28-alpine
+COPY docker/orocommerce/default.conf.template /etc/nginx/templates/default.conf.template
+COPY --from=app /var/www/public /var/www/public

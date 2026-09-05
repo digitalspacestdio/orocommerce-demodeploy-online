@@ -1,0 +1,15 @@
+.git
+.github
+docker/orocommerce/dumps
+node_modules
+vendor
+var/cache
+var/logs
+var/sessions
+public/build
+public/media
+!public/media/.gitkeep
+.env
+.env-app.local
+.env-app.*.local
+config/parameters.yml

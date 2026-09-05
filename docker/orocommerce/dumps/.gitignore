@@ -1,0 +1,3 @@
+# Snapshots created by `make dump` stay out of git (they contain a full database).
+*
+!.gitignore

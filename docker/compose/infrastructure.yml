@@ -1,0 +1,43 @@
+# Shared infrastructure of the demo stack: PostgreSQL, mail catcher, Gotenberg (PDF rendering).
+services:
+  oro-db:
+    image: oroinc/pgsql:17.6-alpine
+    environment:
+      POSTGRES_DB: ${ORO_DB_NAME:-oro_db}
+      POSTGRES_USER: ${ORO_DB_USER:-oro_db_user}
+      POSTGRES_PASSWORD: ${ORO_DB_PASSWORD:-oro_db_pass}
+      POSTGRES_ROOT_PASSWORD: ${ORO_DB_PASSWORD:-oro_db_pass}
+    command: postgres -c shared_buffers=512MB -c max_locks_per_transaction=10000 -c synchronous_commit=off
+    shm_size: 512m
+    volumes:
+      - oro-db-data:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:${ORO_DB_PORT:-5433}:5432"
+    healthcheck:
+      test: "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+    restart: unless-stopped
+
+  mail:
+    image: axllent/mailpit:latest
+    environment:
+      MP_SMTP_AUTH_ACCEPT_ANY: "1"
+      MP_SMTP_AUTH_ALLOW_INSECURE: "1"
+    ports:
+      - "127.0.0.1:${MAIL_UI_PORT:-8026}:8025"
+    restart: unless-stopped
+
+  gotenberg:
+    image: gotenberg/gotenberg:8
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:3000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  oro-db-data:

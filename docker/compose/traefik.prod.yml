@@ -1,0 +1,40 @@
+# Embedded Traefik for a self-hosted demo site on a plain Docker host (docker-compose.prod.yml).
+# Dokploy deployments use the platform Traefik instead (docker-compose.dokploy.yml).
+services:
+  traefik:
+    image: traefik:v3.7
+    restart: unless-stopped
+    command:
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --providers.docker.network=${TRAEFIK_DOCKER_NETWORK:-orodemo-edge}
+      - --ping=true
+      - --entrypoints.web.address=:80
+      - --entrypoints.websecure.address=:443
+      - --entrypoints.web.forwardedHeaders.trustedIPs=10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,127.0.0.0/8
+      - --entrypoints.websecure.forwardedHeaders.trustedIPs=10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,127.0.0.0/8
+      - --certificatesresolvers.letsencrypt.acme.httpchallenge=true
+      - --certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web
+      - --certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL:?set ACME_EMAIL in .env}
+      - --certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json
+    ports:
+      - "${TRAEFIK_BIND_ADDRESS:-0.0.0.0}:80:80"
+      - "${TRAEFIK_BIND_ADDRESS:-0.0.0.0}:443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - traefik-letsencrypt:/letsencrypt
+    networks:
+      - edge-net
+    healthcheck:
+      test: ["CMD", "traefik", "healthcheck", "--ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 10s
+
+networks:
+  edge-net:
+    name: ${TRAEFIK_DOCKER_NETWORK:-orodemo-edge}
+
+volumes:
+  traefik-letsencrypt:

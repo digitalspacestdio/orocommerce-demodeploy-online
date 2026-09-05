@@ -1,0 +1,29 @@
+# Demo site on a plain Docker host: full stack + embedded Traefik (HTTPS, Let's Encrypt).
+#
+#   cp .env.example .env      # set ORO_APP_URL, ORO_PUBLIC_HOST, ORO_PUBLIC_HTTPS=on, ORO_SECRET,
+#                             # TRAEFIK_HOST_RULE, TRAEFIK_DOCKER_NETWORK=orodemo-edge, ACME_EMAIL
+#   docker compose -f docker-compose.prod.yml up -d --build
+#
+# Traefik → oro-nginx → php-fpm. A fresh deploy installs OroCommerce with demo data
+# (oro-install runs before the other services start).
+name: orodemo-prod
+
+include:
+  - path: docker/compose/infrastructure.yml
+  - path: docker/compose/orocommerce.prod.yml
+  - path: docker/compose/traefik-labels.yml
+  - path: docker/compose/traefik.prod.yml
+
+networks:
+  edge-net:
+    name: ${TRAEFIK_DOCKER_NETWORK:-orodemo-edge}
+
+services:
+  oro-db:
+    ports: []
+  mail:
+    ports: []
+  oro-nginx:
+    networks:
+      - default
+      - edge-net
