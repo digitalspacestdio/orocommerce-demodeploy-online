@@ -1,0 +1,22 @@
+#!/bin/sh
+# Enforce the AGENTS.md rule "no agent attribution in commits": drop the trailers an
+# assistant may add, and reject the ones that cannot be dropped silently.
+set -e
+
+msg_file="$1"
+
+sed -i \
+  -e '/^[[:space:]]*[Cc]o-[Aa]uthored-[Bb]y:/d' \
+  -e '/^[[:space:]]*[Cc]laude-[Ss]ession:/d' \
+  -e '/^[[:space:]]*https:\/\/claude\.ai\/code\/session_/d' \
+  "$msg_file"
+
+if grep -qiE '^[[:space:]]*(generated-by|made-with-cursor|assisted-by):' "$msg_file"; then
+  echo "commit-msg: agent attribution is not allowed in commit messages." >&2
+  exit 1
+fi
+
+# Collapse the trailing blank lines the deletions may leave behind.
+awk 'BEGIN{RS=""; ORS="\n\n"} {print}' "$msg_file" > "$msg_file.tmp" && mv "$msg_file.tmp" "$msg_file"
+
+exit 0

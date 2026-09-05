@@ -1,0 +1,29 @@
+#!/bin/sh
+# Refuse commits authored by a synthetic or agent identity: history must name a real person.
+set -e
+
+email="${GIT_AUTHOR_EMAIL:-$(git config --get user.email 2>/dev/null || true)}"
+
+if [ -z "$email" ]; then
+  echo "pre-commit: git user.email is not set." >&2
+  echo "Set a real address, for example: git config user.email you@example.com" >&2
+  exit 1
+fi
+
+case "$email" in
+  *@anthropic.com|*@openai.com|*@cursor.com|*@users.noreply.github.com.invalid|*@example.com|*@example.org|*@example.net|*@localhost|*@invalid|*@test|*@local)
+    echo "pre-commit: blocked author email domain: $email" >&2
+    echo "Use your real address (git config user.email ...)." >&2
+    exit 1
+    ;;
+esac
+
+domain="${email#*@}"
+case "$domain" in
+  *.local|*.intra|*.internal)
+    echo "pre-commit: blocked author email domain: $email" >&2
+    exit 1
+    ;;
+esac
+
+exit 0

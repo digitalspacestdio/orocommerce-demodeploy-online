@@ -25,6 +25,10 @@ repository adds lives in files upstream does not ship, with one exception — th
 - **Branch from the tag.** `7.0.x` = tag `7.0.4` + this stack. To move to a newer patch release,
   rebase this branch onto the new tag; do not merge upstream `master` (it is 7.1).
 - **English** in documentation, comments, commit messages and identifiers.
+- **Authorship.** Commit as a real person; never add `Co-Authored-By`, `Claude-Session`,
+  `Generated-by` or any other agent attribution. The hooks in `.githooks/` enforce this
+  (`pre-commit` rejects synthetic author domains, `commit-msg` strips the trailers); activate
+  them once per clone with `sh scripts/install-git-hooks.sh`.
 - **No secrets in git.** `.env` is ignored; `.env.example` holds defaults only. The demo admin
   password (`Admin1234!`) is a deliberate, published demo credential — never reuse it anywhere real.
 - **Snapshots stay out of git** (`docker/orocommerce/dumps/` is ignored): they contain a full
@@ -61,6 +65,8 @@ docker/orocommerce/
   dumps/                      snapshots (git-ignored)
 .env.example                  every setting with its default
 Makefile                      thin wrapper around the compose commands
+.githooks/                    pre-commit and commit-msg (authorship rules above)
+scripts/install-git-hooks.sh  activates them: git config core.hooksPath .githooks
 ```
 
 Services: `oro-db`, `oro-fpm`, `oro-nginx` (public entry point), `oro-consumer` (message queue),

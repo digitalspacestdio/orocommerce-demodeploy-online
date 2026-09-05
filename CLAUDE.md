@@ -15,3 +15,5 @@ Quick pointers:
 - Demo data is installed automatically by `oro-install`; snapshots for fast deploys are made with
   `make dump` — see "Snapshots" in AGENTS.md.
 - Deploy: `make prod-up` (Traefik) or `docker-compose.dokploy.yml` (Dokploy).
+- Commits carry no agent attribution; run `sh scripts/install-git-hooks.sh` once so the hooks in
+  `.githooks/` enforce it.
