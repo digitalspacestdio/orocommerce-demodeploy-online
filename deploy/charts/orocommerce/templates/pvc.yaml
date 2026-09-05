@@ -1,0 +1,31 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "orocommerce.fullname" . }}-var-data
+  labels:
+    {{- include "orocommerce.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    {{- toYaml .Values.persistence.varData.accessModes | nindent 4 }}
+  resources:
+    requests:
+      storage: {{ .Values.persistence.varData.size }}
+  {{- if .Values.persistence.varData.storageClass }}
+  storageClassName: {{ .Values.persistence.varData.storageClass | quote }}
+  {{- end }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "orocommerce.fullname" . }}-media
+  labels:
+    {{- include "orocommerce.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    {{- toYaml .Values.persistence.media.accessModes | nindent 4 }}
+  resources:
+    requests:
+      storage: {{ .Values.persistence.media.size }}
+  {{- if .Values.persistence.media.storageClass }}
+  storageClassName: {{ .Values.persistence.media.storageClass | quote }}
+  {{- end }}

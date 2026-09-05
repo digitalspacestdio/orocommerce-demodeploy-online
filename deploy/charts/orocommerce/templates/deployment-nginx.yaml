@@ -1,0 +1,64 @@
+{{- $ctx := dict "Chart" .Chart "Release" .Release "Values" .Values "component" "nginx" }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "orocommerce.fullname" . }}-nginx
+  labels:
+    {{- include "orocommerce.componentLabels" $ctx | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount.nginx }}
+  selector:
+    matchLabels:
+      {{- include "orocommerce.componentSelectorLabels" $ctx | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "orocommerce.componentSelectorLabels" $ctx | nindent 8 }}
+    spec:
+      containers:
+        - name: nginx
+          image: "{{ .Values.nginx.image.repository }}:{{ .Values.nginx.image.tag }}"
+          imagePullPolicy: {{ .Values.nginx.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 80
+          volumeMounts:
+            - name: nginx-config
+              # Official nginx image envsubst's *.template into conf.d; override the baked compose template.
+              mountPath: /etc/nginx/templates/default.conf.template
+              subPath: default.conf
+              readOnly: true
+            {{- if .Values.robots.noindex }}
+            - name: robots
+              mountPath: /etc/nginx/robots
+              readOnly: true
+            {{- end }}
+            - name: media
+              mountPath: /var/www/public/media
+              readOnly: true
+          readinessProbe:
+            httpGet:
+              path: /nginx-health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /nginx-health
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.resources.nginx | nindent 12 }}
+      volumes:
+        - name: nginx-config
+          configMap:
+            name: {{ include "orocommerce.fullname" . }}-nginx
+        {{- if .Values.robots.noindex }}
+        - name: robots
+          configMap:
+            name: {{ include "orocommerce.fullname" . }}-robots
+        {{- end }}
+        - name: media
+          persistentVolumeClaim:
+            claimName: {{ include "orocommerce.fullname" . }}-media

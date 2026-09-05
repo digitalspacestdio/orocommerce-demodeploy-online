@@ -1,0 +1,73 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "orocommerce.fullname" . }}-bootstrap
+  labels:
+    {{- include "orocommerce.labels" . | nindent 4 }}
+  annotations:
+    # post-install: Postgres StatefulSet must exist on first release (pre-install would race).
+    # pre-upgrade: re-run before workload rollout on upgrades (design.md decision 3 intent).
+    "helm.sh/hook": post-install,pre-upgrade
+    "helm.sh/hook-weight": "5"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: {{ .Values.bootstrap.backoffLimit }}
+  activeDeadlineSeconds: {{ .Values.bootstrap.activeDeadlineSeconds }}
+  template:
+    metadata:
+      labels:
+        {{- include "orocommerce.labels" . | nindent 8 }}
+        app.kubernetes.io/component: bootstrap
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: bootstrap
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command:
+            - sh
+            - -c
+            - |
+              set -euo pipefail
+              echo "[bootstrap] waiting for Postgres..."
+              . /usr/local/bin/oro-lib
+              for i in $(seq 1 90); do
+                if psql_cmd -d "$DB_NAME" -tAc "select 1" >/dev/null 2>&1; then
+                  echo "[bootstrap] Postgres is ready"
+                  break
+                fi
+                sleep 5
+              done
+              FORCE_RESTORE="{{ .Values.bootstrap.forceRestore }}"
+              DESIRED_MODE="{{ .Values.bootstrap.installMode }}"
+              # design.md decision 3: skip destructive restore when already installed
+              # unless bootstrap.forceRestore=true. install.sh's restore mode always wipes.
+              if [ "$FORCE_RESTORE" = "true" ]; then
+                export ORO_INSTALL_MODE="$DESIRED_MODE"
+              elif [ "$DESIRED_MODE" = "restore" ]; then
+                if oro_is_installed; then
+                  echo "[bootstrap] already installed; forceRestore=false — running post-steps only"
+                  export ORO_INSTALL_MODE=install
+                else
+                  export ORO_INSTALL_MODE=restore
+                fi
+              else
+                export ORO_INSTALL_MODE="$DESIRED_MODE"
+              fi
+              oro-install
+              {{- if .Values.admin.rotatePassword }}
+              if [ -n "${ORO_USER_PASSWORD:-}" ]; then
+                echo "[bootstrap] rotating admin password (admin.rotatePassword=true)"
+                php bin/console oro:user:update "${ORO_USER_NAME:-admin}" --user-password="$ORO_USER_PASSWORD" --env="${ORO_ENV:-prod}" --no-interaction
+              else
+                echo "[bootstrap] admin.rotatePassword=true but ORO_USER_PASSWORD secret key missing — skip"
+              fi
+              {{- end }}
+          env:
+            {{- include "orocommerce.appEnv" . | nindent 12 }}
+          volumeMounts:
+            {{- include "orocommerce.appVolumeMounts" . | nindent 12 }}
+          resources:
+            {{- toYaml .Values.bootstrap.resources | nindent 12 }}
+      volumes:
+        {{- include "orocommerce.appVolumes" . | nindent 8 }}

@@ -1,0 +1,95 @@
+# Public entry point for demodeploy staging: nginx → php-fpm / websocket.
+# k8s-specific: kube-dns resolver and chart Service DNS names (design.md decision 4).
+# Do not edit docker/orocommerce/default.conf.template — that remains for compose.
+map $http_x_forwarded_proto $fcgi_https {
+    default on;
+    https   on;
+    http    off;
+}
+
+map $http_host $oro_host {
+    default          $http_host;
+    ""               "{{ .Values.config.ORO_PUBLIC_HOST }}";
+    "{{ include "orocommerce.fullname" . }}-nginx"      "{{ .Values.config.ORO_PUBLIC_HOST }}";
+    "{{ include "orocommerce.fullname" . }}-nginx:80"   "{{ .Values.config.ORO_PUBLIC_HOST }}";
+}
+
+server {
+    listen 80;
+    server_name _;
+    resolver {{ .Values.nginx.resolver }} valid=10s ipv6=off;
+    set $fpm_upstream {{ include "orocommerce.fullname" . }}-fpm:9000;
+    set $ws_upstream http://{{ include "orocommerce.fullname" . }}-websocket:8080;
+
+    root /var/www/public;
+    index index.php;
+    charset utf-8;
+
+    client_max_body_size 256m;
+    gzip on;
+    gzip_types text/plain text/css application/javascript application/json image/svg+xml;
+
+    access_log /dev/stdout;
+    error_log /dev/stderr warn;
+
+{{- if .Values.robots.noindex }}
+    add_header X-Robots-Tag "noindex, nofollow" always;
+{{- end }}
+
+    location = /nginx-health {
+        access_log off;
+        return 200 "ok\n";
+        add_header Content-Type text/plain;
+    }
+
+    location = /robots.txt {
+        alias /etc/nginx/robots/robots.txt;
+        add_header Content-Type text/plain;
+{{- if .Values.robots.noindex }}
+        add_header X-Robots-Tag "noindex, nofollow" always;
+{{- end }}
+    }
+
+    location ~ /\. { deny all; log_not_found off; }
+
+    location / {
+        try_files $uri $uri/ /index.php$is_args$args;
+    }
+
+    location ~* ^/(bundles|js|build|media)/ {
+        add_header Cache-Control "public";
+{{- if .Values.robots.noindex }}
+        add_header X-Robots-Tag "noindex, nofollow" always;
+{{- end }}
+        expires 1y;
+        try_files $uri /index.php$is_args$args;
+    }
+
+    location /ws {
+        proxy_pass $ws_upstream/$is_args$args;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $oro_host;
+        proxy_read_timeout 86400;
+        proxy_intercept_errors on;
+        error_page 502 503 504 = @ws_unavailable;
+    }
+    location @ws_unavailable { return 503; }
+
+    location ~ ^/(index|index_dev)\.php(/|$) {
+        fastcgi_pass $fpm_upstream;
+        fastcgi_split_path_info ^(.+\.php)(/.*)$;
+        include fastcgi_params;
+        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        fastcgi_param DOCUMENT_ROOT $document_root;
+        fastcgi_param HTTP_HOST $oro_host;
+        fastcgi_param SERVER_NAME $oro_host;
+        fastcgi_param HTTPS $fcgi_https;
+        fastcgi_read_timeout 300s;
+        fastcgi_buffers 32 16k;
+        fastcgi_buffer_size 32k;
+    }
+
+    location ~ \.php$ { return 404; }
+}

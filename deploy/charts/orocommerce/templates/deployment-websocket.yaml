@@ -1,0 +1,38 @@
+{{- $ctx := dict "Chart" .Chart "Release" .Release "Values" .Values "component" "websocket" }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "orocommerce.fullname" . }}-websocket
+  labels:
+    {{- include "orocommerce.componentLabels" $ctx | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount.websocket }}
+  selector:
+    matchLabels:
+      {{- include "orocommerce.componentSelectorLabels" $ctx | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "orocommerce.componentSelectorLabels" $ctx | nindent 8 }}
+    spec:
+      initContainers:
+        {{- include "orocommerce.waitBootstrapInit" . | nindent 8 }}
+      containers:
+        - name: websocket
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command:
+            - sh
+            - -c
+            - "until php bin/console gos:websocket:server; do echo 'websocket exited, restarting in 15s'; sleep 15; done"
+          ports:
+            - name: ws
+              containerPort: 8080
+          env:
+            {{- include "orocommerce.appEnv" . | nindent 12 }}
+          volumeMounts:
+            {{- include "orocommerce.appVolumeMounts" . | nindent 12 }}
+          resources:
+            {{- toYaml .Values.resources.websocket | nindent 12 }}
+      volumes:
+        {{- include "orocommerce.appVolumes" . | nindent 8 }}
