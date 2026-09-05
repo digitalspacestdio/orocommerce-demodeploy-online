@@ -58,14 +58,35 @@ config:
   ORO_APP_URL: ""
   ORO_PUBLIC_HOST: ""
 
-# Bootstrap Job (Helm pre-install/pre-upgrade hook).
+# Bootstrap Job — an ordinary manifest resource, NOT a Helm hook.
+#
+# It used to be a post-install/pre-upgrade hook, which deadlocked the first
+# install: `helm upgrade --install --wait` blocks on Deployments becoming Ready,
+# the app pods block in wait-bootstrap until bootstrap has run, and a post-install
+# hook only fires after --wait returns. The release sat in `pending-install` and
+# the Job was never created (DIG-3005/DIG-3009). As a normal resource the Job is
+# created in the same pass as the Deployments, waits for Postgres itself, then
+# writes a revision marker on the var-data PVC that releases wait-bootstrap.
+#
+# Because the Job now takes part in `--wait`, first install needs a timeout that
+# covers a full oro:install (`--timeout 90m`) — or drop `--wait` and watch the Job.
 bootstrap:
+  enabled: true
   # restore | install | auto — design.md decision 3; staging defaults to restore.
   installMode: restore
   # When false, skip destructive restore if oro_is_installed (design.md decision 3).
   forceRestore: false
   activeDeadlineSeconds: 3600
   backoffLimit: 1
+  # Keep a finished Job around for log retrieval, then let the TTL controller reap it.
+  ttlSecondsAfterFinished: 86400
+  # Job-side wait for Postgres to accept connections (450s by default).
+  postgresWaitRetries: 90
+  postgresWaitIntervalSeconds: 5
+  # App-pod-side wait for the bootstrap marker (1h by default; a first install
+  # with demo data takes 20–40 min).
+  waitRetries: 360
+  waitIntervalSeconds: 10
   resources:
     requests:
       cpu: 250m

@@ -1,18 +1,26 @@
+{{- if .Values.bootstrap.enabled -}}
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: {{ include "orocommerce.fullname" . }}-bootstrap
+  # Revision-scoped name: a Job's spec is immutable, so the Job must be a new
+  # object on every `helm upgrade`. Helm prunes the previous revision's Job
+  # because it is no longer part of the rendered manifest.
+  name: {{ include "orocommerce.fullname" . }}-bootstrap-{{ .Release.Revision }}
   labels:
     {{- include "orocommerce.labels" . | nindent 4 }}
+    app.kubernetes.io/component: bootstrap
   annotations:
-    # post-install: Postgres StatefulSet must exist on first release (pre-install would race).
-    # pre-upgrade: re-run before workload rollout on upgrades (design.md decision 3 intent).
-    "helm.sh/hook": post-install,pre-upgrade
-    "helm.sh/hook-weight": "5"
-    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+    # NOT a Helm hook. A post-install hook deadlocks the very first install:
+    # `helm ... --wait` blocks until the Deployments are Ready, the app pods block
+    # in their wait-bootstrap init container until bootstrap has run, and the hook
+    # that runs bootstrap only fires after --wait returns. As an ordinary manifest
+    # resource the Job is created in the same pass as everything else, so it starts
+    # immediately, waits for Postgres itself, and releases the init containers.
+    orocommerce.io/bootstrap-revision: {{ .Release.Revision | quote }}
 spec:
   backoffLimit: {{ .Values.bootstrap.backoffLimit }}
   activeDeadlineSeconds: {{ .Values.bootstrap.activeDeadlineSeconds }}
+  ttlSecondsAfterFinished: {{ .Values.bootstrap.ttlSecondsAfterFinished }}
   template:
     metadata:
       labels:
@@ -31,13 +39,21 @@ spec:
               set -euo pipefail
               echo "[bootstrap] waiting for Postgres..."
               . /usr/local/bin/oro-lib
-              for i in $(seq 1 90); do
+              pg_ready=""
+              for i in $(seq 1 {{ .Values.bootstrap.postgresWaitRetries }}); do
                 if psql_cmd -d "$DB_NAME" -tAc "select 1" >/dev/null 2>&1; then
                   echo "[bootstrap] Postgres is ready"
+                  pg_ready=1
                   break
                 fi
-                sleep 5
+                sleep {{ .Values.bootstrap.postgresWaitIntervalSeconds }}
               done
+              if [ -z "$pg_ready" ]; then
+                # Falling through to oro-install here would fail with an opaque
+                # Doctrine error instead of naming the real cause.
+                echo "[bootstrap] Postgres did not become ready in time" >&2
+                exit 1
+              fi
               FORCE_RESTORE="{{ .Values.bootstrap.forceRestore }}"
               DESIRED_MODE="{{ .Values.bootstrap.installMode }}"
               # design.md decision 3: skip destructive restore when already installed
@@ -63,6 +79,13 @@ spec:
                 echo "[bootstrap] admin.rotatePassword=true but ORO_USER_PASSWORD secret key missing — skip"
               fi
               {{- end }}
+              # Release the wait-bootstrap init containers of this revision. The marker
+              # lives on the shared var-data PVC so app pods can see it without RBAC.
+              marker_dir={{ include "orocommerce.bootstrapMarkerDir" . | quote }}
+              mkdir -p "$marker_dir"
+              rm -f "$marker_dir"/* 2>/dev/null || true
+              echo "{{ .Release.Revision }}" > "$marker_dir/{{ .Release.Revision }}"
+              echo "[bootstrap] done — marker $marker_dir/{{ .Release.Revision }} written"
           env:
             {{- include "orocommerce.appEnv" . | nindent 12 }}
           volumeMounts:
@@ -71,3 +94,4 @@ spec:
             {{- toYaml .Values.bootstrap.resources | nindent 12 }}
       volumes:
         {{- include "orocommerce.appVolumes" . | nindent 8 }}
+{{- end -}}

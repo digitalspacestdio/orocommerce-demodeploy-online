@@ -1,6 +1,10 @@
 # Staging release values for orocommerce.demodeploy.online
 # Parent: DIG-3000 / Implement: DIG-3003 / OpenSpec: orocommerce-staging-helm
 #
+# Release `orocommerce` in namespace `orocommerce` — its OWN namespace, not the shared
+# `staging` one, because this release owns a Postgres StatefulSet and RWO PVCs.
+# Install command, timeout and recovery steps: deploy/README.md.
+#
 # Secrets are NOT here — create Secret `orocommerce-secrets` in the release
 # namespace (Paperclip / sealed-secrets / external-secrets) with keys documented
 # in deploy/charts/orocommerce/values.yaml (ORO_SECRET, ORO_DB_URL, ORO_DB_DSN,
