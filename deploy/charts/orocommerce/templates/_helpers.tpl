@@ -219,9 +219,25 @@ Shared non-secret + secret-ref env for Oro app workloads (fpm/consumer/cron/webs
 {{- end -}}
 
 {{/*
-Init container: wait until bootstrap Job has finished (oro_is_installed).
-Needed because the Job is post-install (must run after Postgres exists) and
-therefore races with Deployments on first install.
+Directory on the var-data PVC where the bootstrap Job records the release
+revision it completed. Both the Job and the app pods mount this claim, so it
+carries the "bootstrap finished" signal without granting pods RBAC on Jobs.
+*/}}
+{{- define "orocommerce.bootstrapMarkerDir" -}}
+/var/www/var/data/.bootstrap
+{{- end -}}
+
+{{/*
+Init container: hold app pods until this release revision has been bootstrapped.
+
+The bootstrap Job is an ordinary manifest resource (see job-bootstrap.yaml), so
+it is created together with the Deployments and starts immediately. Waiting for
+the revision marker — rather than only for oro_is_installed — preserves the
+ordering the old pre-upgrade hook gave us: on an upgrade the app pods do not roll
+out until the new revision's bootstrap (migrations, post-install steps) is done.
+
+With bootstrap.enabled=false nothing writes a marker, so fall back to the plain
+oro_is_installed check instead of blocking forever.
 */}}
 {{- define "orocommerce.waitBootstrapInit" -}}
 - name: wait-bootstrap
@@ -233,14 +249,26 @@ therefore races with Deployments on first install.
     - |
       set -euo pipefail
       . /usr/local/bin/oro-lib
-      echo "[wait-bootstrap] waiting for oro_is_installed..."
-      for i in $(seq 1 360); do
+      {{- if .Values.bootstrap.enabled }}
+      marker={{ printf "%s/%d" (include "orocommerce.bootstrapMarkerDir" .) (int .Release.Revision) | quote }}
+      echo "[wait-bootstrap] waiting for bootstrap of revision {{ .Release.Revision }} ($marker)..."
+      for i in $(seq 1 {{ .Values.bootstrap.waitRetries }}); do
+        if [ -f "$marker" ]; then
+          echo "[wait-bootstrap] bootstrap complete"
+          exit 0
+        fi
+        sleep {{ .Values.bootstrap.waitIntervalSeconds }}
+      done
+      {{- else }}
+      echo "[wait-bootstrap] bootstrap.enabled=false — waiting for oro_is_installed..."
+      for i in $(seq 1 {{ .Values.bootstrap.waitRetries }}); do
         if oro_is_installed; then
           echo "[wait-bootstrap] application is installed"
           exit 0
         fi
-        sleep 10
+        sleep {{ .Values.bootstrap.waitIntervalSeconds }}
       done
+      {{- end }}
       echo "[wait-bootstrap] timed out waiting for bootstrap Job" >&2
       exit 1
   env:
