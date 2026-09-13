@@ -59,26 +59,45 @@ admin:
 # Default true; PO may set false to defer PDF generation.
 gotenberg:
   enabled: true
+  # DIG-3623 / DIG-3614: sidecar class, replicas often 0 — profile default 64Mi (no usage yet).
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
 
 # --- Open question: Mailpit UI exposure (design.md Open Questions §4) ---
 # ClusterIP-only by default; set exposeUI: true only if QA needs the UI ingress.
 mailpit:
   enabled: true
   exposeUI: false
+  # DIG-3623 / DIG-3614: sidecar class — already at profile floor.
+  resources:
+    requests:
+      cpu: 10m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
 
-# --- Open question: cluster resource headroom (design.md Open Questions §6) ---
-# Defaults match compose (shared_buffers=512MB, PHP memory footprint). Birdperson
-# may lower requests/limits if demodeploy nodes are constrained.
+# DIG-3623 / DIG-3614 staging right-size (founder directive DIG-3610).
+# Empty postgres: lower shared_buffers/work_mem/max_connections so 128Mi request is honest.
+# App pods currently scaled to 0 → class defaults (max(128Mi, usage×1.3)); cron left alone.
+# Limits not reduced (OOM-cascade guardrail); CPU unchanged.
 postgres:
   enabled: true
   persistence:
     size: 20Gi
-  sharedBuffers: 512MB
-  shmSize: 512Mi
+  sharedBuffers: 32MB
+  workMem: 4MB
+  maxConnections: "50"
+  shmSize: 64Mi
   resources:
     requests:
       cpu: 250m
-      memory: 1Gi
+      memory: 128Mi
     limits:
       cpu: "2"
       memory: 2Gi
@@ -96,7 +115,7 @@ resources:
   fpm:
     requests:
       cpu: 250m
-      memory: 1Gi
+      memory: 128Mi
     limits:
       cpu: "2"
       memory: 3Gi
@@ -110,10 +129,11 @@ resources:
   consumer:
     requests:
       cpu: 100m
-      memory: 512Mi
+      memory: 128Mi
     limits:
       cpu: "1"
       memory: 2Gi
+  # cron: intentionally unchanged (DIG-3614 — cron / one-shot not steady-state)
   cron:
     requests:
       cpu: 50m
@@ -124,7 +144,7 @@ resources:
   websocket:
     requests:
       cpu: 50m
-      memory: 256Mi
+      memory: 128Mi
     limits:
       cpu: 500m
       memory: 1Gi
