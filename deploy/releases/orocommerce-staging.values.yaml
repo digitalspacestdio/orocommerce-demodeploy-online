@@ -115,7 +115,7 @@ resources:
   fpm:
     requests:
       cpu: 250m
-      memory: 128Mi
+      memory: 768Mi
     limits:
       cpu: "2"
       memory: 3Gi
@@ -129,7 +129,7 @@ resources:
   consumer:
     requests:
       cpu: 100m
-      memory: 128Mi
+      memory: 640Mi
     limits:
       cpu: "1"
       memory: 2Gi
@@ -144,7 +144,7 @@ resources:
   websocket:
     requests:
       cpu: 50m
-      memory: 128Mi
+      memory: 576Mi
     limits:
       cpu: 500m
       memory: 1Gi
