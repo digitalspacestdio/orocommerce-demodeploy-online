@@ -83,7 +83,7 @@ mailpit:
       memory: 256Mi
 
 # DIG-3623 / DIG-3614 staging right-size (founder directive DIG-3610).
-# Empty postgres: lower shared_buffers/work_mem/max_connections so 128Mi request is honest.
+# DIG-3782 wave E: sharedBuffers already 32MB; measured usage still above 128Mi → request = usage×1.3.
 # App pods currently scaled to 0 → class defaults (max(128Mi, usage×1.3)); cron left alone.
 # Limits not reduced (OOM-cascade guardrail); CPU unchanged.
 postgres:
@@ -97,7 +97,7 @@ postgres:
   resources:
     requests:
       cpu: 250m
-      memory: 128Mi
+      memory: 256Mi
     limits:
       cpu: "2"
       memory: 2Gi
